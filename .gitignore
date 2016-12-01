@@ -1,0 +1,50 @@
+*.pyc
+*.pyo
+*.swp
+*~
+
+# Packages
+*.egg
+*.egg-info
+dist
+build/
+eggs
+bin
+sdist
+
+#Sphinx builds
+_build
+
+# Installer logs
+pip-log.txt
+
+# Flake8 violation file
+violations.flake8.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+__pycache__
+database.db
+
+# Sphinx
+docs/_build
+
+# Virtual environments
+venv
+venv*
+
+.webassets-cache
+.DS_Store
+*.sublime-*
+
+# In production
+admin/static/uploaded/*
+admin/static/editor_storage/*
+local_settings.py
+reload
+
+# test file
+#*.json
+.idea/
