@@ -1,71 +1,117 @@
 # -*- coding: utf-8 -*-
 
-import logging
 import multiprocessing
 import socket
-
-import requests
-
-host = '127.0.0.1'
-port = 1234
+import time
 
 
-def log(msg):
-    pass
+class HttpProxy(object):
+    """http proxy"""
+
+    def __init__(self, host, port):
+        self.addr = (host, port)
+
+    def run(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(self.addr)
+        s.listen(5)
+
+        process_list = []
+
+        """ prefork """
+        for i in range(4):
+            process = multiprocessing.Process(target=HttpProxy.worker, args=(s,))
+            process.daemon = True
+            process.start()
+            process_list.append(process)
+
+        for p in process_list:
+            p.join()
+
+    @classmethod
+    def recv_timeout(cls, server, timeout=2):
+        server.setblocking(0)
+
+        begin = time.time()
+        data = ''
+
+        while True:
+            if len(data) != 0 and time.time() - begin > timeout:
+                break
+            elif time.time() - begin > 2 * timeout:
+                break
+
+            try:
+                ret = server.recv(8192)
+                if ret:
+                    data += ret
+                    begin = time.time()
+                else:
+                    time.sleep(0.1)
+            except:
+                pass
+
+        return data
+
+    @classmethod
+    def forward(cls, client, src, method, header_dict=None, params=''):
+        host = socket.gethostbyname(header_dict['Host'])
+        port = 80
+
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.connect((host, port))
+
+        if method == 'HEAD':
+            pass
+        elif method == 'GET':
+            header = 'GET {} HTTP/1.1\r\n'.format(src)
+            for key in header_dict:
+                header += '{}: {}\r\n'.format(key, header_dict[key])
+            header += '\r\n'
+            server.sendall(header)
+
+            client.sendall(cls.recv_timeout(server))
+
+        elif method == 'POST':
+            pass
+
+        server.close()
+
+    @classmethod
+    def worker(cls, s):
+        while True:
+            client, addr = s.accept()
+            request = cls.recv_timeout(client, 1)
+            if len(request) == 0:
+                client.close()
+                continue
+
+            print addr
+            print request
+
+            method, src, proto = request.split('\r\n')[0].split(' ')
+
+            if 'http' in src:
+                scheme = 'http'
+            elif '443' in src:
+                scheme = 'https'
+            if scheme == 'https':
+                client.close()
+                continue
+
+            header_dict = {}
+            for header in request.split('\r\n')[1:]:
+                if len(header) != 0:
+                    header_dict[header.split(':')[0]] = header.split(':')[1].strip(' ')
+
+            if header_dict.has_key('Proxy-Connection'):
+                header_dict.pop('Proxy-Connection')
+            header_dict['User-Agent'] = 'HttpProxy'
+
+            cls.forward(client, src, method, header_dict)
+            client.close()
 
 
-def forward(conn, addr):
-    pass
-
-
-def worker(s):
-    while True:
-        conn, addr = s.accept()
-        request = conn.recv(1024)
-
-        method, src, proto = request.split('\r\n')[0].split(' ')
-        if 'http' in src:
-            scheme = 'http'
-        elif '443' in src:
-            scheme = 'https'
-        headers = {}
-        for header in request.split('\r\n')[1:]:
-            if len(header) != 0:
-                headers[header.split(':')[0]] = header.split(':')[1].strip(' ')
-
-        print request
-        print method
-        print src
-        print scheme
-        print headers
-
-        if scheme == 'https':
-            logging.debug('https unsupported!')
-            conn.close()
-
-        if method == 'GET':
-            rsp = requests.get(src)
-            if rsp.status_code != 200:
-                conn.sendall('Request Error')
-            else:
-                conn.sendall(rsp.content)
-
-        conn.close()
-
-
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind((host, port))
-s.listen(5)
-
-process_list = []
-
-""" prefork """
-for i in range(4):
-    process = multiprocessing.Process(target=worker, args=(s,))
-    process.daemon = True
-    process.start()
-    process_list.append(process)
-
-for p in process_list:
-    p.join()
+if __name__ == '__main__':
+    HttpProxy('127.0.0.1', 1234).run()
