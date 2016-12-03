@@ -12,16 +12,16 @@ class HttpProxy(object):
         self.addr = (host, port)
 
     def run(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(self.addr)
-        s.listen(5)
+        proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        proxy.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        proxy.bind(self.addr)
+        proxy.listen(5)
 
         process_list = []
 
         """ prefork """
         for i in range(4):
-            process = multiprocessing.Process(target=HttpProxy.worker, args=(s,))
+            process = multiprocessing.Process(target=HttpProxy.worker, args=(proxy,))
             process.daemon = True
             process.start()
             process_list.append(process)
@@ -30,8 +30,8 @@ class HttpProxy(object):
             p.join()
 
     @classmethod
-    def recv_timeout(cls, server, timeout=2):
-        server.setblocking(0)
+    def recv_timeout(cls, sock, timeout=2):
+        sock.setblocking(0)
 
         begin = time.time()
         data = ''
@@ -43,7 +43,7 @@ class HttpProxy(object):
                 break
 
             try:
-                ret = server.recv(8192)
+                ret = sock.recv(8192)
                 if ret:
                     data += ret
                     begin = time.time()
@@ -56,7 +56,10 @@ class HttpProxy(object):
 
     @classmethod
     def forward(cls, client, src, method, header_dict=None, params=''):
-        host = socket.gethostbyname(header_dict['Host'])
+        try:
+            host = socket.gethostbyname(header_dict['Host'])
+        except:
+            return
         port = 80
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -79,9 +82,9 @@ class HttpProxy(object):
         server.close()
 
     @classmethod
-    def worker(cls, s):
+    def worker(cls, proxy):
         while True:
-            client, addr = s.accept()
+            client, addr = proxy.accept()
             request = cls.recv_timeout(client, 1)
             if len(request) == 0:
                 client.close()
