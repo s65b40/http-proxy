@@ -90,7 +90,7 @@ class HttpProxy(object):
                 client.close()
                 continue
 
-            print addr
+            print addr, multiprocessing.current_process().pid
             print request
 
             method, src, proto = request.split('\r\n')[0].split(' ')
