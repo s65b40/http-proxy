@@ -1,2 +1,2 @@
 ## http-proxy
-python实现的http代理
+用python实现的http代理
