@@ -75,7 +75,6 @@ class HttpProxy(object):
             server.sendall(header)
 
             client.sendall(cls.recv_timeout(server))
-
         elif method == 'POST':
             pass
 
@@ -99,6 +98,7 @@ class HttpProxy(object):
                 scheme = 'http'
             elif '443' in src:
                 scheme = 'https'
+
             if scheme == 'https':
                 client.close()
                 continue
